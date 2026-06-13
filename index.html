@@ -1,497 +1,292 @@
 <!DOCTYPE html>
-<html lang="ja" translate="no">
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>AR 椅子ビューア</title>
+  <script type="module"
+    src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js">
+  </script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background: #0a0a14;
-      overflow: hidden;
+      background: #f5f5f5;
       font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-      color: #fff;
-      touch-action: none;
+      color: #1a1a1a;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
     }
 
-    canvas { display: block; }
-
-    /* ── スタート画面 ── */
-    #start-screen {
-      position: fixed; inset: 0;
-      display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      background: linear-gradient(160deg, #0f0c29, #302b63, #24243e);
-      z-index: 100;
-      gap: 20px;
-      padding: 40px;
+    /* ── Header ── */
+    header {
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
-    .logo {
-      font-size: 72px;
-      filter: drop-shadow(0 0 30px rgba(255,180,60,0.6));
-      animation: float 3s ease-in-out infinite;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50%       { transform: translateY(-12px); }
-    }
-
-    #start-screen h1 {
-      font-size: clamp(1.4em, 5vw, 2em);
+    header h1 {
+      font-size: 1.05em;
       font-weight: 700;
-      text-align: center;
-      letter-spacing: 0.02em;
+      letter-spacing: 0.01em;
     }
 
-    #start-screen .sub {
-      color: #9090b0;
-      font-size: clamp(0.85em, 3vw, 1em);
-      text-align: center;
-      line-height: 1.7;
-    }
-
-    #ar-btn {
-      margin-top: 10px;
-      background: linear-gradient(135deg, #e47911, #f5a623);
+    header .badge {
+      margin-left: auto;
+      background: #e47911;
       color: #fff;
-      border: none;
-      padding: 16px 48px;
-      font-size: 1.15em;
+      font-size: 0.72em;
       font-weight: 700;
-      border-radius: 50px;
-      cursor: pointer;
-      box-shadow: 0 6px 30px rgba(228,121,17,0.45);
-      transition: transform 0.1s, box-shadow 0.1s;
+      padding: 3px 9px;
+      border-radius: 12px;
       letter-spacing: 0.04em;
     }
 
-    #ar-btn:active {
-      transform: scale(0.95);
-      box-shadow: 0 2px 12px rgba(228,121,17,0.3);
+    /* ── Viewer ── */
+    model-viewer {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      background: linear-gradient(160deg, #f8f8f0 0%, #eceae0 100%);
+      --poster-color: transparent;
     }
 
-    .req-note {
-      color: #555577;
-      font-size: 0.78em;
-      text-align: center;
-    }
-
-    /* ── 非対応画面 ── */
-    #not-supported {
-      display: none;
-      position: fixed; inset: 0;
-      flex-direction: column;
-      align-items: center; justify-content: center;
-      background: #0a0a14;
-      z-index: 200;
-      padding: 40px;
-      gap: 20px;
-      text-align: center;
-    }
-
-    #not-supported h2 { font-size: 1.5em; }
-
-    #not-supported p {
-      color: #9090b0;
-      line-height: 1.8;
-      max-width: 340px;
-    }
-
-    /* ── AR中のオーバーレイ ── */
-    #overlay {
-      display: none;
-      position: fixed; inset: 0;
-      z-index: 10;
-      pointer-events: none;
-    }
-
-    #exit-btn {
+    /* AR Button — overlaid on viewer */
+    #ar-btn {
       position: absolute;
-      top: max(44px, env(safe-area-inset-top, 44px));
-      right: 20px;
-      pointer-events: all;
-      background: rgba(0,0,0,0.55);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: #fff;
-      font-size: 0.88em;
-      padding: 8px 16px;
-      border-radius: 20px;
-      cursor: pointer;
-    }
-
-    #hint-box {
-      position: absolute;
-      bottom: 200px;
-      left: 50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.62);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      padding: 10px 22px;
-      border-radius: 24px;
-      font-size: 0.92em;
-      white-space: nowrap;
-      transition: opacity 0.4s;
-    }
-
-    #controls {
-      position: absolute;
-      bottom: max(40px, env(safe-area-inset-bottom, 40px));
-      left: 50%; transform: translateX(-50%);
+      bottom: 16px;
+      right: 16px;
       display: flex;
-      gap: 12px;
-      pointer-events: all;
-    }
-
-    .ctrl {
-      background: rgba(255,255,255,0.18);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.28);
+      align-items: center;
+      gap: 7px;
+      background: #e47911;
       color: #fff;
-      font-size: 0.88em;
-      padding: 12px 18px;
-      border-radius: 22px;
+      border: none;
+      padding: 13px 20px;
+      border-radius: 50px;
+      font-size: 0.95em;
+      font-weight: 700;
       cursor: pointer;
-      transition: background 0.15s;
+      box-shadow: 0 4px 18px rgba(228, 121, 17, 0.45);
       white-space: nowrap;
+      font-family: inherit;
+      letter-spacing: 0.02em;
     }
 
-    .ctrl:active { background: rgba(255,255,255,0.32); }
+    #ar-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
 
-    #reset-ctrl {
-      background: rgba(228,121,17,0.35);
-      border-color: rgba(228,121,17,0.5);
+    /* ── Product info ── */
+    .product {
+      background: #fff;
+      padding: 20px;
+      flex: 1;
+    }
+
+    .product-name {
+      font-size: 1.2em;
+      font-weight: 700;
+      margin-bottom: 6px;
+      line-height: 1.35;
+    }
+
+    .product-sub {
+      color: #555;
+      font-size: 0.88em;
+      margin-bottom: 16px;
+      line-height: 1.6;
+    }
+
+    .ar-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: #fff8f0;
+      border: 1px solid #ffd199;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+    }
+
+    .ar-note .icon { font-size: 1.4em; flex-shrink: 0; margin-top: 1px; }
+
+    .ar-note p {
+      font-size: 0.87em;
+      color: #5a3800;
+      line-height: 1.65;
+    }
+
+    .ar-note strong { font-weight: 700; }
+
+    .specs {
+      border-top: 1px solid #ebebeb;
+      padding-top: 16px;
+    }
+
+    .specs h3 {
+      font-size: 0.82em;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    .specs ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .specs li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.91em;
+      color: #333;
+    }
+
+    .specs li::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #e47911;
+      flex-shrink: 0;
+    }
+
+    /* ── No AR fallback (shown when browser/device doesn't support AR) ── */
+    .no-ar {
+      display: none;
+      align-items: flex-start;
+      gap: 10px;
+      background: #f0f4ff;
+      border: 1px solid #c5d0ff;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+    }
+
+    .no-ar .icon { font-size: 1.4em; flex-shrink: 0; }
+
+    .no-ar p {
+      font-size: 0.87em;
+      color: #2a3880;
+      line-height: 1.65;
     }
   </style>
 </head>
 <body>
 
-<!-- スタート画面 -->
-<div id="start-screen">
-  <div class="logo">🪑</div>
-  <h1>AR 椅子ビューア</h1>
-  <p class="sub">
-    カメラで実際の部屋を映して<br>
-    好きな場所に椅子を置いてみよう
-  </p>
-  <button id="ar-btn">AR を開始する</button>
-  <p class="req-note">カメラへのアクセスが必要です<br>iPadOS 15.4以上の Safari でご利用ください</p>
-</div>
+<header>
+  <span style="font-size:1.3em">🪑</span>
+  <h1>プレミアム ウッドチェア</h1>
+  <span class="badge">AR 対応</span>
+</header>
 
-<!-- 非対応 -->
-<div id="not-supported">
-  <h2>⚠️ AR 非対応</h2>
-  <p>
-    このブラウザは WebXR AR に対応していません。<br><br>
-    <strong>iPadOS 15.4以上の Safari</strong> でお試しください。<br><br>
-    Android の場合は Chrome をお使いください。
-  </p>
-</div>
+<model-viewer
+  id="viewer"
+  src="chair.glb"
+  ar
+  ar-modes="webxr scene-viewer quick-look"
+  ar-placement="floor"
+  camera-controls
+  auto-rotate
+  auto-rotate-delay="500"
+  rotation-per-second="18deg"
+  shadow-intensity="1.2"
+  shadow-softness="1"
+  environment-image="neutral"
+  exposure="0.9"
+  camera-orbit="-25deg 75deg 1.8m"
+  min-camera-orbit="auto auto 0.8m"
+  max-camera-orbit="auto auto 4m"
+  interaction-prompt="none"
+  alt="木製椅子の3Dモデル"
+>
+  <!-- AR ボタン -->
+  <button id="ar-btn" slot="ar-button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
+      <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+      <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
+      <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+    部屋に置いてみる
+  </button>
+</model-viewer>
 
-<!-- AR オーバーレイ -->
-<div id="overlay">
-  <button id="exit-btn">✕ 終了</button>
-  <div id="hint-box">📱 平らな面にカメラを向けてください</div>
-  <div id="controls">
-    <button class="ctrl" id="rot-l">↺ 左回転</button>
-    <button class="ctrl" id="reset-ctrl">リセット</button>
-    <button class="ctrl" id="rot-r">↻ 右回転</button>
+<div class="product">
+
+  <p class="product-name">ナチュラルウッド アームチェア</p>
+  <p class="product-sub">
+    天然木フレームとファブリッククッションを組み合わせた、シンプルで上品な木製椅子です。<br>
+    ARボタンで実際のお部屋に置いた雰囲気を確認できます。
+  </p>
+
+  <div class="ar-note">
+    <span class="icon">📱</span>
+    <p>
+      <strong>AR で試す：</strong>
+      「部屋に置いてみる」をタップすると、カメラを使って実際の部屋に椅子を配置できます。<br>
+      ピンチでサイズ変更、ドラッグで移動、2本指で回転。
+    </p>
   </div>
-</div>
 
-<!-- Three.js -->
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
+  <div class="no-ar" id="no-ar-msg">
+    <span class="icon">💻</span>
+    <p>
+      <strong>3Dプレビュー：</strong>
+      このデバイスはARに対応していません。
+      iPadOS 15.4以上のSafari、またはAndroid Chromeでお試しください。<br>
+      3Dモデルはドラッグ・ピンチで回転・拡大できます。
+    </p>
+  </div>
+
+  <div class="specs">
+    <h3>仕様</h3>
+    <ul>
+      <li>素材：天然木（ウォルナット調）</li>
+      <li>クッション：ファブリック（ネイビー）</li>
+      <li>アームレスト付き</li>
+      <li>高さ約 98cm（背もたれ上端まで）</li>
+      <li>座面高さ約 45cm</li>
+    </ul>
+  </div>
+
+</div>
 
 <script type="module">
-import * as THREE from 'three';
+  const viewer = document.getElementById('viewer');
 
-/* ─────────── 椅子モデル（プロシージャル） ─────────── */
-function buildChair() {
-  const g = new THREE.Group();
-
-  const wood = new THREE.MeshStandardMaterial({ color: 0x7B4A1E, roughness: 0.75, metalness: 0.0 });
-  const fabric = new THREE.MeshStandardMaterial({ color: 0x2c3a4a, roughness: 0.95, metalness: 0.0 });
-
-  const add = (geo, mat, x, y, z) => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z);
-    m.castShadow = true;
-    m.receiveShadow = true;
-    g.add(m);
-    return m;
-  };
-
-  // 座面フレーム
-  add(new THREE.BoxGeometry(0.46, 0.05, 0.46), wood, 0, 0.44, 0);
-  // 座クッション
-  add(new THREE.BoxGeometry(0.42, 0.065, 0.42), fabric, 0, 0.505, 0);
-
-  // 背もたれフレーム
-  const backFrame = add(new THREE.BoxGeometry(0.46, 0.50, 0.045), wood, 0, 0.73, -0.21);
-  // 背もたれクッション
-  add(new THREE.BoxGeometry(0.41, 0.44, 0.04), fabric, 0, 0.73, -0.19);
-
-  // 脚 4本
-  const legGeo = new THREE.CylinderGeometry(0.026, 0.020, 0.44, 10);
-  [[-0.19, -0.19], [0.19, -0.19], [-0.19, 0.19], [0.19, 0.19]].forEach(([x, z]) => {
-    add(legGeo, wood, x, 0.22, z);
-  });
-
-  // 肘掛け
-  const armGeo = new THREE.BoxGeometry(0.04, 0.038, 0.38);
-  const armSupGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.14, 8);
-  [-0.235, 0.235].forEach(x => {
-    add(armGeo, wood, x, 0.60, 0.02);
-    add(armSupGeo, wood, x, 0.535, 0.19);
-  });
-
-  // 横桟 (貫)
-  const stretGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.37, 8);
-  const stretGeoZ = new THREE.CylinderGeometry(0.018, 0.018, 0.37, 8).applyMatrix4(
-    new THREE.Matrix4().makeRotationY(Math.PI / 2)
-  );
-  add(new THREE.CylinderGeometry(0.018, 0.018, 0.37, 8).applyMatrix4(
-    new THREE.Matrix4().makeRotationZ(Math.PI / 2)
-  ), wood, 0, 0.12, -0.19);
-  add(new THREE.CylinderGeometry(0.018, 0.018, 0.37, 8).applyMatrix4(
-    new THREE.Matrix4().makeRotationZ(Math.PI / 2)
-  ), wood, 0, 0.12, 0.19);
-  add(new THREE.CylinderGeometry(0.018, 0.018, 0.37, 8).applyMatrix4(
-    new THREE.Matrix4().makeRotationX(Math.PI / 2)
-  ), wood, -0.19, 0.12, 0);
-  add(new THREE.CylinderGeometry(0.018, 0.018, 0.37, 8).applyMatrix4(
-    new THREE.Matrix4().makeRotationX(Math.PI / 2)
-  ), wood, 0.19, 0.12, 0);
-
-  // スケール調整（実物大 約80cm）
-  g.scale.setScalar(0.8);
-  return g;
-}
-
-/* ─────────── レティクル（照準リング） ─────────── */
-function buildReticle() {
-  const geo = new THREE.RingGeometry(0.10, 0.135, 32).rotateX(-Math.PI / 2);
-  const mat = new THREE.MeshBasicMaterial({
-    color: 0xffffff, opacity: 0.85, transparent: true, side: THREE.DoubleSide
-  });
-  const r = new THREE.Mesh(geo, mat);
-
-  const dotGeo = new THREE.CircleGeometry(0.022, 20).rotateX(-Math.PI / 2);
-  const dot = new THREE.Mesh(dotGeo, mat.clone());
-  r.add(dot);
-
-  r.matrixAutoUpdate = false;
-  r.visible = false;
-  return r;
-}
-
-/* ─────────── シャドウ受けプレーン ─────────── */
-function buildShadowPlane() {
-  const geo = new THREE.PlaneGeometry(3, 3).rotateX(-Math.PI / 2);
-  const mat = new THREE.ShadowMaterial({ opacity: 0.28 });
-  const p = new THREE.Mesh(geo, mat);
-  p.receiveShadow = true;
-  p.visible = false;
-  return p;
-}
-
-/* ─────────── メイン ─────────── */
-let scene, camera, renderer;
-let reticle, chair, shadowPlane;
-let hitTestSource = null;
-let hitTestRequested = false;
-let placed = false;
-let yaw = 0;
-let session = null;
-
-async function startAR() {
-  if (!navigator.xr) { showNotSupported(); return; }
-
-  const ok = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
-  if (!ok) { showNotSupported(); return; }
-
-  // Scene setup
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.01, 30);
-
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(devicePixelRatio);
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.xr.enabled = true;
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  document.body.appendChild(renderer.domElement);
-
-  // Lighting
-  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-  dir.position.set(1.5, 4, 2);
-  dir.castShadow = true;
-  dir.shadow.mapSize.set(1024, 1024);
-  dir.shadow.camera.near = 0.1;
-  dir.shadow.camera.far = 10;
-  dir.shadow.camera.left = dir.shadow.camera.bottom = -2;
-  dir.shadow.camera.right = dir.shadow.camera.top = 2;
-  scene.add(dir);
-
-  const fill = new THREE.DirectionalLight(0xc8d8ff, 0.35);
-  fill.position.set(-2, 2, -1);
-  scene.add(fill);
-
-  // Objects
-  reticle = buildReticle();
-  scene.add(reticle);
-
-  chair = buildChair();
-  chair.visible = false;
-  scene.add(chair);
-
-  shadowPlane = buildShadowPlane();
-  scene.add(shadowPlane);
-
-  // XR Session
-  try {
-    session = await navigator.xr.requestSession('immersive-ar', {
-      requiredFeatures: ['hit-test'],
-      optionalFeatures: ['dom-overlay', 'light-estimation'],
-      domOverlay: { root: document.getElementById('overlay') }
-    });
-  } catch (e) {
-    showNotSupported(); return;
-  }
-
-  renderer.xr.setReferenceSpaceType('local');
-  await renderer.xr.setSession(session);
-
-  document.getElementById('start-screen').style.display = 'none';
-  document.getElementById('overlay').style.display = 'block';
-
-  renderer.domElement.addEventListener('touchstart', onTap, { passive: false });
-  session.addEventListener('end', onEnd);
-  renderer.setAnimationLoop(onFrame);
-}
-
-function onTap(e) {
-  e.preventDefault();
-  if (!reticle.visible) return;
-
-  const pos = new THREE.Vector3().setFromMatrixPosition(reticle.matrix);
-  chair.position.copy(pos);
-  chair.rotation.y = yaw;
-  chair.visible = true;
-
-  shadowPlane.position.copy(pos);
-  shadowPlane.visible = true;
-
-  placed = true;
-  setHint('✅ 配置完了！ボタンで向きを変えられます', 2800);
-}
-
-function onFrame(_, frame) {
-  if (!frame) return;
-
-  const refSpace = renderer.xr.getReferenceSpace();
-  const xrSession = renderer.xr.getSession();
-
-  if (!hitTestRequested) {
-    xrSession.requestReferenceSpace('viewer').then(vs => {
-      xrSession.requestHitTestSource({ space: vs }).then(src => {
-        hitTestSource = src;
-      });
-    }).catch(() => {});
-    hitTestRequested = true;
-  }
-
-  if (hitTestSource) {
-    const results = frame.getHitTestResults(hitTestSource);
-    if (results.length > 0) {
-      const pose = results[0].getPose(refSpace);
-      reticle.visible = true;
-      reticle.matrix.fromArray(pose.transform.matrix);
-
-      if (!placed) setHint('👆 タップして椅子を置く');
-    } else {
-      reticle.visible = false;
-      if (!placed) setHint('📱 平らな面にカメラを向けてください');
+  // AR が使えないデバイスではメモ欄を切り替える
+  viewer.addEventListener('ar-status', (e) => {
+    if (e.detail.status === 'not-presenting') {
+      // AR session 終了
     }
-  }
+  });
 
-  renderer.render(scene, camera);
-}
-
-function onEnd() {
-  hitTestSource = null;
-  hitTestRequested = false;
-  placed = false;
-  yaw = 0;
-  session = null;
-  renderer.setAnimationLoop(null);
-  renderer.domElement.remove();
-  renderer.dispose();
-  document.getElementById('overlay').style.display = 'none';
-  document.getElementById('start-screen').style.display = 'flex';
-}
-
-function showNotSupported() {
-  document.getElementById('not-supported').style.display = 'flex';
-}
-
-let hintTimer = null;
-function setHint(msg, autoClear = 0) {
-  const el = document.getElementById('hint-box');
-  el.textContent = msg;
-  el.style.opacity = '1';
-  clearTimeout(hintTimer);
-  if (autoClear > 0) {
-    hintTimer = setTimeout(() => { el.style.opacity = '0'; }, autoClear);
-  }
-}
-
-/* ─────────── UI イベント ─────────── */
-document.getElementById('ar-btn').addEventListener('click', startAR);
-
-document.getElementById('exit-btn').addEventListener('click', () => {
-  if (session) session.end();
-});
-
-document.getElementById('rot-l').addEventListener('click', () => {
-  yaw -= Math.PI / 8;
-  if (chair && placed) chair.rotation.y = yaw;
-});
-
-document.getElementById('rot-r').addEventListener('click', () => {
-  yaw += Math.PI / 8;
-  if (chair && placed) chair.rotation.y = yaw;
-});
-
-document.getElementById('reset-ctrl').addEventListener('click', () => {
-  placed = false;
-  yaw = 0;
-  if (chair) chair.visible = false;
-  if (shadowPlane) shadowPlane.visible = false;
-  setHint('📱 平らな面にカメラを向けてください');
-});
-
-window.addEventListener('resize', () => {
-  if (!camera || !renderer) return;
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
+  // AR ボタンが非表示になる = 非対応デバイス
+  viewer.addEventListener('load', () => {
+    setTimeout(() => {
+      const arBtn = viewer.querySelector('#ar-btn');
+      if (!arBtn || getComputedStyle(arBtn).display === 'none') {
+        document.getElementById('no-ar-msg').style.display = 'flex';
+      }
+    }, 1000);
+  });
 </script>
+
 </body>
 </html>
